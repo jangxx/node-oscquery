@@ -1,30 +1,34 @@
 import {
-	OSCQueryService,
+	OSCQueryServer,
 	OSCQueryServiceOptions,
-} from "./lib/osc_query_service";
+} from "./lib/osc_query_server";
 
 import {
-	OSCEndpointDescription,
-	OSCEndpointArgument,
+	OSCTypeSimple,
 	OSCQRange,
 	OSCQClipmode,
-} from "./lib/osc_node";
-
-import {
-	OSCType
+	OSCQAccess
 } from "./lib/osc_types";
 
 import {
-	OSCQAccess
-} from "./lib/osc_access";
+	OSCQueryDiscovery,
+	OSCQueryDiscoveryOptions,
+} from "./lib/osc_query_discovery";
+
+import {
+	OSCMethodDescription,
+	OSCMethodArgument,
+} from "./lib/osc_method_description";
 
 export {
-	OSCQueryService,
+	OSCQueryServer,
 	OSCQueryServiceOptions,
-	OSCEndpointDescription,
-	OSCEndpointArgument,
+	OSCMethodDescription,
+	OSCMethodArgument,
 	OSCQRange,
 	OSCQClipmode,
-	OSCType,
+	OSCTypeSimple as OSCType,
 	OSCQAccess,
+	OSCQueryDiscovery,
+	OSCQueryDiscoveryOptions,
 };

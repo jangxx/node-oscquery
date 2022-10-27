@@ -1,12 +1,12 @@
 import {
-	OSCQueryService,
+	OSCQueryServer,
 	OSCType,
 	OSCQAccess,
 } from "../index";
 
 // this example is almost an exact copy of the example on https://github.com/Vidvox/OSCQueryProposal#oscquery-examples
 
-const service = new OSCQueryService({
+const service = new OSCQueryServer({
 	oscPort: 9001,
 	httpPort: 9001,
 });

@@ -1,18 +1,20 @@
 import http from "node:http";
-import bonjour from "bonjour";
+import { getResponder, type Responder, type CiaoService, Protocol } from "@homebridge/ciao";
 
-import { OSCNode, OSCEndpointDescription, SerializedNode } from "./osc_node"; 
-import { OSCQAccess } from "./osc_access";
+import { OSCNode } from "./osc_node"; 
+import { SerializedNode } from "./serialized_node";
+import { OSCQAccess } from "./osc_types";
+import { OSCMethodDescription } from "./osc_method_description";
 
 export interface OSCQueryServiceOptions {
 	httpPort: number;
 	bindAddress?: string;
-	mdnsOptions?: bonjour.BonjourOptions;
 	rootDescription?: string,
 	oscQueryHostName?: string,
 	oscIp?: string,
 	oscPort?: number,
 	oscTransport?: "TCP" | "UDP",
+	serviceName?: string,
 	// wsIp?: string,
 	// wsPort?: string,
 }
@@ -51,8 +53,9 @@ function respondJson(json: Object, res: http.ServerResponse) {
 	res.end();
 }
 
-export class OSCQueryService {
-	private _bonjour: bonjour.Bonjour | null;
+export class OSCQueryServer {
+	private _mdns: Responder;
+	private _mdnsService: CiaoService;
 	private _server: http.Server;
 	private _opts: OSCQueryServiceOptions;
 	private _root: OSCNode = new OSCNode("");
@@ -61,7 +64,14 @@ export class OSCQueryService {
 		this._opts = opts;
 
 		this._server = http.createServer(this._httpHandler.bind(this));
-		this._bonjour = null;
+
+		this._mdns = getResponder();
+		this._mdnsService = this._mdns.createService({
+			name: opts.serviceName || "OSCQuery",
+			type: "oscjson",
+			port: opts.httpPort,
+			protocol: Protocol.TCP,
+		});
 
 		this._root.setOpts({
 			description: this._opts.rootDescription || "root node",
@@ -115,38 +125,44 @@ export class OSCQueryService {
 			return respondJson(node.serialize(), res);
 		} else {
 			const serialized = node.serialize();
+
+			const access = serialized.ACCESS;
+			if (access !== undefined) {
+				if ((access == 0 || access == 2) && query == "VALUE") {
+					res.statusCode = 204;
+					return res.end();
+				}
+			}
+
 			return respondJson({
 				[query]: serialized[query as keyof SerializedNode],
 			}, res);
 		}
 	}
 
-	start(): Promise<null> {
-		this._bonjour = bonjour(this._opts.mdnsOptions);
-
-		this._bonjour.publish({
-			type: "_oscjson._tcp.",
-			name: "OSCQuery",
-			port: this._opts.httpPort,
+	start(): Promise<[void, void]> {
+		const httpListenPromise: Promise<void> = new Promise(resolve => {
+			this._server.listen(this._opts.httpPort, this._opts.bindAddress || "0.0.0.0", resolve);
 		});
 
-		return new Promise(resolve => {
-			this._server.listen(this._opts.httpPort, this._opts.bindAddress || "0.0.0.0", () => resolve(null));
-		});
+		return Promise.all([
+			httpListenPromise,
+			this._mdnsService.advertise(),
+		]);
 	}
 
-	stop(): Promise<null> {
-		if (this._bonjour) {
-			this._bonjour.destroy();
-			this._bonjour = null;
-		}
-
-		return new Promise((resolve, reject) => {
-			this._server.close(err => err ? reject(err) : resolve(null));
+	stop(): Promise<[void, void]> {
+		const httpEndPromise: Promise<void> = new Promise((resolve, reject) => {
+			this._server.close(err => err ? reject(err) : resolve());
 		});
+
+		return Promise.all([
+			httpEndPromise,
+			this._mdnsService.end(),
+		]);
 	}
 
-	addEndpoint(path: string, params: OSCEndpointDescription) {
+	addEndpoint(path: string, params: OSCMethodDescription) {
 		const path_split = path.split("/").filter(p => p !== "");
 
 		let node = this._root;

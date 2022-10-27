@@ -1,22 +1,8 @@
-import { OSCType } from "./osc_types";
-import { OSCQAccess } from "./osc_access";
+import { OSCTypeSimple, OSCType, OSCQClipmode, OSCQRange, OSCQAccess } from "./osc_types";
+import { SerializedNode } from "./serialized_node";
+import { OSCMethodArgument, OSCMethodDescription } from "./osc_method_description";
 
-export interface OSCQRange {
-	min?: number;
-	max?: number;
-	vals?: unknown[];
-}
-
-export type OSCQClipmode = "none" | "low" | "high" | "both";
-
-export interface OSCEndpointArgument {
-	type: OSCType | OSCType[],
-	range?: OSCQRange,
-	clipmode?: OSCQClipmode,
-	value?: unknown, // example value
-};
-
-function generateValue(type: OSCType | OSCType[], arg: OSCEndpointArgument): unknown {
+function generateValue(type: OSCType, arg: OSCMethodArgument): unknown {
 	if (Array.isArray(type)) {
 		return type.map(t => generateValue(t, arg));
 	}
@@ -26,11 +12,11 @@ function generateValue(type: OSCType | OSCType[], arg: OSCEndpointArgument): unk
 	}
 
 	switch(type) {
-		case OSCType.INT:
-		case OSCType.FLOAT:
-		case OSCType.BIGINT:
-		case OSCType.DOUBLE:
-		case OSCType.TIMETAG:
+		case OSCTypeSimple.INT:
+		case OSCTypeSimple.FLOAT:
+		case OSCTypeSimple.BIGINT:
+		case OSCTypeSimple.DOUBLE:
+		case OSCTypeSimple.TIMETAG:
 			if (arg.range?.min !== undefined) { // if a range is defined just return the lower bound
 				return arg.range.min;
 			} else if (arg.range?.max !== undefined) { // if a range is defined or the upper bound if we only have that
@@ -40,29 +26,29 @@ function generateValue(type: OSCType | OSCType[], arg: OSCEndpointArgument): unk
 			} else { // otherwise just return 1
 				return 1;
 			}
-		case OSCType.STRING:
-		case OSCType.ALTSTRING:
-		case OSCType.CHAR:
+		case OSCTypeSimple.STRING:
+		case OSCTypeSimple.ALTSTRING:
+		case OSCTypeSimple.CHAR:
 			if (arg.range?.vals !== undefined && arg.range?.vals.length > 0) {
 				return arg.range.vals[0];
 			} else {
 				return "a"; // this is both a string and also a char
 			}
-		case OSCType.COLOR:
+		case OSCTypeSimple.COLOR:
 			return "#FFFFFFFF";
-		case OSCType.BLOB:
-		case OSCType.MIDI:
-		case OSCType.NIL:
-		case OSCType.INFINITUM:
+		case OSCTypeSimple.BLOB:
+		case OSCTypeSimple.MIDI:
+		case OSCTypeSimple.NIL:
+		case OSCTypeSimple.INFINITUM:
 			return null;
-		case OSCType.TRUE:
+		case OSCTypeSimple.TRUE:
 			return true;
-		case OSCType.FALSE:
+		case OSCTypeSimple.FALSE:
 			return false;
 	}
 }
 
-function getTypeString(type: OSCType | OSCType[]): string {
+function getTypeString(type: OSCType): string {
 	if (Array.isArray(type)) {
 		return "[" + type.map(getTypeString).join("") + "]";
 	} else {
@@ -78,31 +64,6 @@ function assembleFullPath(node: OSCNode): string {
 	}
 }
 
-export interface OSCEndpointDescription {
-	description?: string;
-	access?: OSCQAccess,
-	tags?: string[],
-	critical?: boolean,
-	arguments?: OSCEndpointArgument[];
-}
-
-export type SerializedNode = {
-	FULL_PATH: string,
-	CONTENTS?: Record<string, SerializedNode>,
-	TYPE?: string,
-	ACCESS?: number,
-	RANGE?: {
-		MIN?: number,
-		MAX?: number,
-		VALS?: unknown[],
-	}[],
-	DESCRIPTION?: string,
-	TAGS?: string[],
-	CRITICAL?: boolean,
-	CLIPMODE?: OSCQClipmode[],
-	VALUE?: unknown[],
-}
-
 export class OSCNode {
 	private _parent?: OSCNode;
 	private _name: string;
@@ -110,7 +71,7 @@ export class OSCNode {
 	private _access?: OSCQAccess;
 	private _tags?: string[];
 	private _critical?: boolean;
-	private _args?: OSCEndpointArgument[];
+	private _args?: OSCMethodArgument[];
 	private _children: Record<string, OSCNode> = {};
 
 	constructor(name: string, parent?: OSCNode) {
@@ -131,7 +92,7 @@ export class OSCNode {
 		return this._name;
 	}
 
-	setOpts(desc: OSCEndpointDescription) {
+	setOpts(desc: OSCMethodDescription) {
 		this._description = desc.description;
 		this._access = desc.access;
 		this._tags = desc.tags;

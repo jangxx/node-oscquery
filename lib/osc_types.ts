@@ -1,5 +1,5 @@
 // https://hangar.org/wp-content/uploads/2012/01/The-Open-Sound-Control-1.0-Specification-opensoundcontrol.org_.pdf
-export enum OSCType {
+export enum OSCTypeSimple {
 	// standard:
 	INT = "i",
 	FLOAT = "f",
@@ -20,4 +20,50 @@ export enum OSCType {
 	INFINITUM = "I",
 
 	// arrays are handled as actual arrays of OSCTypes
+};
+
+export const OSCTypeSimpleMap: Record<string, OSCTypeSimple> = {
+	"i": OSCTypeSimple.INT,
+	"f": OSCTypeSimple.FLOAT,
+	"s": OSCTypeSimple.STRING,
+	"b": OSCTypeSimple.BLOB,
+	"h": OSCTypeSimple.BIGINT,
+	"t": OSCTypeSimple.TIMETAG,
+	"d": OSCTypeSimple.DOUBLE,
+	"S": OSCTypeSimple.ALTSTRING,
+	"c": OSCTypeSimple.CHAR,
+	"r": OSCTypeSimple.COLOR,
+	"m": OSCTypeSimple.MIDI,
+	"T": OSCTypeSimple.TRUE,
+	"F": OSCTypeSimple.FALSE,
+	"N": OSCTypeSimple.NIL,
+	"I": OSCTypeSimple.INFINITUM,
+};
+
+export type OSCType = OSCTypeSimple | OSCType[];
+
+export interface OSCQRange {
+	min?: number;
+	max?: number;
+	vals?: unknown[];
+}
+
+export type OSCQClipmode = "none" | "low" | "high" | "both";
+
+export enum OSCQAccess {
+	NO_VALUE = 0,
+	READONLY = 1,
+	WRITEONLY = 2,
+	READWRITE = 3,
+	NA = 0,
+	R = 1,
+	W = 2,
+	RW = 3,
+}
+
+export const OSCQAccessMap: Record<number, OSCQAccess> = {
+	0: OSCQAccess.NO_VALUE,
+	1: OSCQAccess.READONLY,
+	2: OSCQAccess.WRITEONLY,
+	3: OSCQAccess.READWRITE,
 };
