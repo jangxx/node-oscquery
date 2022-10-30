@@ -2,7 +2,7 @@ import http from "node:http";
 import { getResponder, type Responder, type CiaoService, Protocol } from "@homebridge/ciao";
 
 import { OSCNode } from "./osc_node"; 
-import { SerializedNode } from "./serialized_node";
+import { SerializedHostInfo, SerializedNode } from "./serialized_node";
 import { OSCQAccess } from "./osc_types";
 import { OSCMethodDescription } from "./osc_method_description";
 
@@ -99,7 +99,7 @@ export class OSCQueryServer {
 		}
 
 		if (query == "HOST_INFO") {
-			return respondJson({
+			const hostInfo: SerializedHostInfo = {
 				NAME: this._opts.oscQueryHostName,
 				EXTENSIONS,
 				OSC_IP: this._opts.oscIp,
@@ -107,7 +107,9 @@ export class OSCQueryServer {
 				OSC_TRANSPORT: this._opts.oscTransport,
 				// WS_IP: this._opts.wsIp,
 				// WS_PORT: this._opts.wsPort,
-			}, res);
+			};
+
+			return respondJson(hostInfo, res);
 		}
 
 		let node = this._root;
@@ -138,6 +140,22 @@ export class OSCQueryServer {
 				[query]: serialized[query as keyof SerializedNode],
 			}, res);
 		}
+	}
+
+	_getNodeForPath(path: string): OSCNode | null {
+		const path_split = path.split("/").filter(p => p !== "");
+
+		let node = this._root;
+
+		for (const path_component of path_split) {
+			if (node.hasChild(path_component)) {
+				node = node.getChild(path_component);
+			} else {
+				return null; // this endpoint doesn't exist
+			}
+		}
+
+		return node;
 	}
 
 	start(): Promise<[void, void]> {
@@ -175,17 +193,9 @@ export class OSCQueryServer {
 	}
 
 	removeEndpoint(path: string) {
-		const path_split = path.split("/").filter(p => p !== "");
+		let node = this._getNodeForPath(path);
 
-		let node = this._root;
-
-		for (const path_component of path_split) {
-			if (node.hasChild(path_component)) {
-				node = node.getChild(path_component);
-			} else {
-				return; // this endpoint doesn't exist
-			}
-		}
+		if (!node) return;
 
 		node.setOpts({}); // make the node into an empty container
 
@@ -194,6 +204,22 @@ export class OSCQueryServer {
 		while (node.parent != null && node.isEmpty()) {
 			node.parent.removeChild(node.name);
 			node = node.parent;
+		}
+	}
+
+	setValue(path: string, arg_index: number, value: unknown) {
+		const node = this._getNodeForPath(path);
+
+		if (node) {
+			node.setValue(arg_index, value);
+		}
+	}
+
+	unsetValue(path: string, arg_index: number, value: unknown) {
+		const node = this._getNodeForPath(path);
+
+		if (node) {
+			node.unsetValue(arg_index, value);
 		}
 	}
 }

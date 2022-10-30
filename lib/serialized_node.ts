@@ -5,16 +5,16 @@ export type SerializedNode = {
 	CONTENTS?: Record<string, SerializedNode>,
 	TYPE?: string,
 	ACCESS?: number,
-	RANGE?: {
+	RANGE?: ({
 		MIN?: number,
 		MAX?: number,
 		VALS?: unknown[],
-	}[],
+	} | null)[],
 	DESCRIPTION?: string,
 	TAGS?: string[],
 	CRITICAL?: boolean,
-	CLIPMODE?: OSCQClipmode[],
-	VALUE?: unknown[],
+	CLIPMODE?: (OSCQClipmode | null)[],
+	VALUE?: (unknown | null)[],
 }
 
 export type SerializedHostInfo = {

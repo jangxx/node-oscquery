@@ -4,10 +4,11 @@ import axios from "axios";
 import { SerializedHostInfo, SerializedNode } from "./serialized_node";
 import { OSCMethodDescription, OSCMethodArgument } from "./osc_method_description";
 import { OSCQAccess, OSCQAccessMap, OSCType, OSCTypeSimpleMap } from "./osc_types";
+import { OSCNode } from "./osc_node";
 
-export interface OSCQueryDiscoveryOptions {
+// export interface OSCQueryDiscoveryOptions {
 	
-}
+// }
 
 interface HostInfo {
 	name?: string;
@@ -31,17 +32,11 @@ function deserializeHostInfo(host_info: SerializedHostInfo): HostInfo {
 	};
 }
 
-interface OSCMethodNode extends OSCMethodDescription {
-	readonly fullPath: string;
-	readonly contents?: Record<string, OSCMethodNode>;
-}
-
 function parseTypeString(type_string: string): OSCType {
 	const tokens: (string | string[])[] = [];
 	let current_token = "";
 	let brackets_open = 0;
 	for (const c of type_string) {
-		// console.log(c, current_token, brackets_open);
 		if (c == "[" && brackets_open == 0) {
 			current_token = "";
 			brackets_open = 1;
@@ -73,44 +68,92 @@ function parseTypeString(type_string: string): OSCType {
 	});
 }
 
-function deserializeMethodNode(node: SerializedNode): OSCMethodNode {
-	let contents: Record<string, OSCMethodNode> | undefined = undefined;
+function deserializeMethodNode(node: SerializedNode, parent?: OSCNode): OSCNode {
+	const full_path_split = node.FULL_PATH.split("/");
+	const osc_node = new OSCNode(full_path_split[full_path_split.length - 1], parent);
+
 	if (node.CONTENTS) {
-		contents = {};
 		for (const key in node.CONTENTS) {
-			contents[key] = deserializeMethodNode(node.CONTENTS[key]);
+			osc_node.addChild(key, deserializeMethodNode(node.CONTENTS[key], osc_node));
 		}
 	}
 
 	let method_arguments: OSCMethodArgument[] | undefined = undefined;
 	if (node.TYPE) {
 		method_arguments = [];
-		const arg_types = parseTypeString(node.TYPE);
+		let arg_types = parseTypeString(node.TYPE);
 
-		// TODO: the rest of this function
+		if (!Array.isArray(arg_types)) {
+			arg_types = [ arg_types ]; // this should never happen
+		}
+
+		for (let i = 0; i < arg_types.length; i++) {
+			const method_arg: OSCMethodArgument = {
+				type: arg_types[i],
+			};
+
+			if (node.RANGE && node.RANGE[i] !== null) {
+				method_arg.range = {
+					min: node.RANGE[i]?.MIN,
+					max: node.RANGE[i]?.MAX,
+					vals: node.RANGE[i]?.VALS,
+				}
+			}
+
+			if (node.CLIPMODE && node.CLIPMODE[i]) {
+				method_arg.clipmode = node.CLIPMODE[i]!;
+			}
+
+			if (node.VALUE && node.VALUE[i] !== undefined) {
+				method_arg.value = node.VALUE[i];
+			}
+		}
 	}
 
-	return {
-		fullPath: node.FULL_PATH,
-		contents,
+	osc_node.setOpts({
 		description: node.DESCRIPTION,
 		access: node.ACCESS ? OSCQAccessMap[node.ACCESS] : undefined,
 		tags: node.TAGS,
 		critical: node.CRITICAL,
 		arguments: method_arguments,
-	}
+	});
+
+	return osc_node;
 }
 
 class DiscoveredService {
+	private _hostInfo?: HostInfo;
+	private _nodes?: OSCNode;
+
 	constructor(
 		readonly address: string,
 		readonly port: number,
-		readonly hostInfo: HostInfo,
-		readonly nodes: OSCMethodNode,
 	) {}
 
+	get hostInfo(): HostInfo {
+		if (!this._hostInfo) {
+			throw new Error("HostInfo has not been loaded yet");
+		}
+		return this._hostInfo;
+	}
+
+	get nodes(): OSCNode {
+		if (!this._nodes) {
+			throw new Error("Nodes have not been loaded yet");
+		}
+		return this._nodes;
+	}
+
 	flat() {
-		// TODO: turn the nested map into a flat map of only accessible methods
+		return Array.from(this.nodes._methodGenerator());
+	}
+
+	async update() {
+		const baseResp = await axios.get<SerializedNode>("http://" + this.address + ":" + this.port);
+		const hostInfoResp = await axios.get<SerializedHostInfo>("http://" + this.address + ":" + this.port + "?HOST_INFO");
+
+		this._hostInfo = deserializeHostInfo(hostInfoResp.data);
+		this._nodes = deserializeMethodNode(baseResp.data);
 	}
 }
 
@@ -119,7 +162,7 @@ export class OSCQueryDiscovery extends EventEmitter {
 	private _mdnsBrowser: Browser | null = null;
 	private _services: DiscoveredService[] = [];
 
-	constructor(opts: OSCQueryDiscoveryOptions) {
+	constructor() {
 		super();
 	}
 
@@ -146,15 +189,12 @@ export class OSCQueryDiscovery extends EventEmitter {
 	}
 
 	async queryNewService(address: string, port: number) {
-		const baseResp = await axios.get<SerializedNode>("http://" + address + ":" + port);
-		const hostInfoResp = await axios.get<SerializedHostInfo>("http://" + address + ":" + port + "?HOST_INFO");
-
 		const service = new DiscoveredService(
 			address,
 			port,
-			deserializeHostInfo(hostInfoResp.data),
-			deserializeMethodNode(baseResp.data),
 		);
+
+		await service.update();
 
 		this._services.push(service);
 		this.emit("up", service);

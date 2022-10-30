@@ -2,52 +2,6 @@ import { OSCTypeSimple, OSCType, OSCQClipmode, OSCQRange, OSCQAccess } from "./o
 import { SerializedNode } from "./serialized_node";
 import { OSCMethodArgument, OSCMethodDescription } from "./osc_method_description";
 
-function generateValue(type: OSCType, arg: OSCMethodArgument): unknown {
-	if (Array.isArray(type)) {
-		return type.map(t => generateValue(t, arg));
-	}
-
-	if (arg.value) {
-		return arg.value;
-	}
-
-	switch(type) {
-		case OSCTypeSimple.INT:
-		case OSCTypeSimple.FLOAT:
-		case OSCTypeSimple.BIGINT:
-		case OSCTypeSimple.DOUBLE:
-		case OSCTypeSimple.TIMETAG:
-			if (arg.range?.min !== undefined) { // if a range is defined just return the lower bound
-				return arg.range.min;
-			} else if (arg.range?.max !== undefined) { // if a range is defined or the upper bound if we only have that
-				return arg.range.max;
-			} else if (arg.range?.vals !== undefined && arg.range?.vals.length > 0) { // maybe we have some predefined values to return?
-				return arg.range.vals[0];
-			} else { // otherwise just return 1
-				return 1;
-			}
-		case OSCTypeSimple.STRING:
-		case OSCTypeSimple.ALTSTRING:
-		case OSCTypeSimple.CHAR:
-			if (arg.range?.vals !== undefined && arg.range?.vals.length > 0) {
-				return arg.range.vals[0];
-			} else {
-				return "a"; // this is both a string and also a char
-			}
-		case OSCTypeSimple.COLOR:
-			return "#FFFFFFFF";
-		case OSCTypeSimple.BLOB:
-		case OSCTypeSimple.MIDI:
-		case OSCTypeSimple.NIL:
-		case OSCTypeSimple.INFINITUM:
-			return null;
-		case OSCTypeSimple.TRUE:
-			return true;
-		case OSCTypeSimple.FALSE:
-			return false;
-	}
-}
-
 function getTypeString(type: OSCType): string {
 	if (Array.isArray(type)) {
 		return "[" + type.map(getTypeString).join("") + "]";
@@ -62,6 +16,13 @@ function assembleFullPath(node: OSCNode): string {
 	} else {
 		return assembleFullPath(node.parent) + "/" + node.name;
 	}
+}
+
+function allNull(arr: unknown[]): boolean {
+	for (const elem of arr) {
+		if (arr !== null) return false;
+	}
+	return true;
 }
 
 export class OSCNode {
@@ -92,6 +53,31 @@ export class OSCNode {
 		return this._name;
 	}
 
+	_getMethodDescription(full_path: string): OSCMethodDescription {
+		return {
+			full_path,
+			description: this._description,
+			access: this._access,
+			tags: this._tags,
+			critical: this._critical,
+			arguments: this._args,
+		};
+	}
+
+	*_methodGenerator(starting_path: string = ""): Generator<OSCMethodDescription> {
+		if (!this.isContainer()) {
+			yield this._getMethodDescription(starting_path + this.name);
+		}
+
+		if (this._children) {
+			for (const child of Object.values(this._children)) {
+				for (const md of child._methodGenerator(starting_path + "/" + child.name)) {
+					yield md;
+				}
+			}
+		}
+	}
+
 	setOpts(desc: OSCMethodDescription) {
 		this._description = desc.description;
 		this._access = desc.access;
@@ -100,12 +86,28 @@ export class OSCNode {
 		this._args = desc.arguments;
 	}
 
-	isEmpty() { // if there are no arguments and no children the node is empty
+	setValue(arg_index: number, value: unknown) {
+		if (!this._args || arg_index >= this._args.length) {
+			throw new Error("Argument index out of range")
+		}
+
+		this._args[arg_index].value = value;
+	}
+
+	unsetValue(arg_index: number, value: unknown) {
+		if (!this._args || arg_index >= this._args.length) {
+			throw new Error("Argument index out of range")
+		}
+
+		delete this._args[arg_index].value;
+	}
+
+	isEmpty() { // if there are no arguments and no children, the node is empty
 		return !this._args && Object.keys(this._children).length == 0;
 	}
 
 	isContainer() {
-		return !this._args  && Object.keys(this._children).length > 0;
+		return !this._args && Object.keys(this._children).length > 0;
 	}
 
 	addChild(path: string, node: OSCNode) {
@@ -138,7 +140,7 @@ export class OSCNode {
 		return this._children[path];
 	}
 
-	serialize(full_path: string | null = null) {
+	serialize(full_path: string | null = null): SerializedNode {
 		full_path = assembleFullPath(this);
 
 		const result: SerializedNode = {
@@ -163,40 +165,38 @@ export class OSCNode {
 		if (this._args) {
 			let arg_types: string = "";
 			// these are set to null in case one of the args doesn't specify them
-			let arg_ranges: OSCQRange[] | null = [];
-			let arg_clipmodes: OSCQClipmode[] | null = [];
+			let arg_ranges: (OSCQRange | null)[] = [];
+			let arg_clipmodes: (OSCQClipmode | null)[] | null = [];
 			const arg_values: unknown[] = [];
 
 			for (const arg of this._args) {
 				arg_types += getTypeString(arg.type);
-				arg_values.push(generateValue(arg.type, arg));
-
-				if (arg_ranges !== null && arg.range) {
-					arg_ranges.push(arg.range);
-				} else if (!arg.range) { // if one of the args doesn't specify a range, the generation of the range field is disabled
-					arg_ranges = null;
-				}
-
-				if (arg_clipmodes !== null && arg.clipmode) {
-					arg_clipmodes.push(arg.clipmode);
-				} else if (!arg.clipmode) { // if one of the args doesn't specify a clipmode, the generation of the range field is disabled
-					arg_clipmodes = null;
-				}
+				arg_values.push(arg.value || null);
+				arg_ranges.push(arg.range || null);
+				arg_clipmodes.push(arg.clipmode || null);
 			}
 
 			result.TYPE = arg_types;
 
-			if (arg_ranges) {
-				result.RANGE = arg_ranges.map(range => ({
-					MAX: range.max,
-					MIN: range.min,
-					VALS: range.vals,
-				}));
+			if (!allNull(arg_ranges)) {
+				result.RANGE = arg_ranges.map(range => {
+					if (range) {
+						return {
+							MAX: range.max,
+							MIN: range.min,
+							VALS: range.vals,
+						}
+					} else {
+						return null;
+					}
+				});
 			}
 
-			if (arg_clipmodes) result.CLIPMODE = arg_clipmodes;
+			if (!allNull(arg_clipmodes)) {
+				result.CLIPMODE = arg_clipmodes;
+			}
 
-			if (this._access && (this._access == 1 || this._access == 3)) {
+			if (this._access && !allNull(arg_values) && (this._access == 1 || this._access == 3)) {
 				result.VALUE = arg_values;
 			}
 		}
