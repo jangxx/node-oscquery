@@ -1,15 +1,18 @@
 import { OSCQClipmode } from "./osc_types"
 
+type SerializedRangeSingle = {
+	MIN?: number,
+	MAX?: number,
+	VALS?: unknown[],
+};
+export type SerializedRange = SerializedRangeSingle | null | SerializedRange[];
+
 export type SerializedNode = {
 	FULL_PATH: string,
 	CONTENTS?: Record<string, SerializedNode>,
 	TYPE?: string,
 	ACCESS?: number,
-	RANGE?: ({
-		MIN?: number,
-		MAX?: number,
-		VALS?: unknown[],
-	} | null)[],
+	RANGE?: (SerializedRange | null)[],
 	DESCRIPTION?: string,
 	TAGS?: string[],
 	CRITICAL?: boolean,

@@ -1,9 +1,9 @@
 import { EventEmitter } from "node:events";
 import Bonjour, { type Browser, type Service } from "bonjour-service";
 import axios from "axios";
-import { SerializedHostInfo, SerializedNode } from "./serialized_node";
+import { SerializedHostInfo, SerializedNode, SerializedRange } from "./serialized_node";
 import { OSCMethodDescription, OSCMethodArgument } from "./osc_method_description";
-import { OSCQAccess, OSCQAccessMap, OSCType, OSCTypeSimpleMap } from "./osc_types";
+import { OSCQAccess, OSCQAccessMap, OSCQRange, OSCType, OSCTypeSimpleMap } from "./osc_types";
 import { OSCNode } from "./osc_node";
 
 // export interface OSCQueryDiscoveryOptions {
@@ -68,6 +68,22 @@ function parseTypeString(type_string: string): OSCType {
 	});
 }
 
+function deserializeRange(range: SerializedRange): OSCQRange {
+	if (Array.isArray(range)) {
+		return range.map(r => deserializeRange(r));
+	} else {
+		if (range !== null) {
+			return {
+				min: range.MIN,
+				max: range.MAX,
+				vals: range.VALS,
+			}
+		} else {
+			return null;
+		}
+	}
+}
+
 function deserializeMethodNode(node: SerializedNode, parent?: OSCNode): OSCNode {
 	const full_path_split = node.FULL_PATH.split("/");
 	const osc_node = new OSCNode(full_path_split[full_path_split.length - 1], parent);
@@ -82,7 +98,7 @@ function deserializeMethodNode(node: SerializedNode, parent?: OSCNode): OSCNode 
 	if (node.TYPE) {
 		method_arguments = [];
 		let arg_types = parseTypeString(node.TYPE);
-
+		
 		if (!Array.isArray(arg_types)) {
 			arg_types = [ arg_types ]; // this should never happen
 		}
@@ -93,11 +109,7 @@ function deserializeMethodNode(node: SerializedNode, parent?: OSCNode): OSCNode 
 			};
 
 			if (node.RANGE && node.RANGE[i] !== null) {
-				method_arg.range = {
-					min: node.RANGE[i]?.MIN,
-					max: node.RANGE[i]?.MAX,
-					vals: node.RANGE[i]?.VALS,
-				}
+				method_arg.range = deserializeRange(node.RANGE[i]!);
 			}
 
 			if (node.CLIPMODE && node.CLIPMODE[i]) {
@@ -107,6 +119,8 @@ function deserializeMethodNode(node: SerializedNode, parent?: OSCNode): OSCNode 
 			if (node.VALUE && node.VALUE[i] !== undefined) {
 				method_arg.value = node.VALUE[i];
 			}
+
+			method_arguments.push(method_arg);
 		}
 	}
 
@@ -121,7 +135,7 @@ function deserializeMethodNode(node: SerializedNode, parent?: OSCNode): OSCNode 
 	return osc_node;
 }
 
-class DiscoveredService {
+export class DiscoveredService {
 	private _hostInfo?: HostInfo;
 	private _nodes?: OSCNode;
 

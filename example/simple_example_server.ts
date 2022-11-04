@@ -6,10 +6,7 @@ import {
 
 // this example is almost an exact copy of the example on https://github.com/Vidvox/OSCQueryProposal#oscquery-examples
 
-const service = new OSCQueryServer({
-	oscPort: 9001,
-	httpPort: 9001,
-});
+const service = new OSCQueryServer();
 
 service.addEndpoint("/foo", {
 	description: "demonstrates a read-only OSC node- single float value ranged 0-100",
@@ -21,6 +18,7 @@ service.addEndpoint("/foo", {
 		}
 	]
 });
+service.setValue("/foo", 0, 0.5);
 
 service.addEndpoint("/bar", {
 	description: "demonstrates a read/write OSC node- two ints with different ranges",
@@ -29,7 +27,6 @@ service.addEndpoint("/bar", {
 		{
 			type: OSCType.INT,
 			range: { min: 0, max: 50 },
-			value: 4, // <-- this field is entirely optional. An example value will be generated automatically if it's not given
 		},
 		{
 			type: OSCType.INT,
@@ -37,6 +34,8 @@ service.addEndpoint("/bar", {
 		}
 	]
 });
+service.setValue("/bar", 0, 4);
+service.setValue("/bar", 1, 51);
 
 service.addEndpoint("/baz", {
 	description: "simple container node, with one method- qux",
@@ -52,5 +51,22 @@ service.addEndpoint("/baz/qux", {
 		}
 	]
 });
+service.setValue("/baz/qux", 0, "half-full");
+
+// complex example with array types:
+
+// service.addEndpoint("/test", {
+// 	description: "array test",
+// 	access: OSCQAccess.READONLY,
+// 	arguments: [
+// 		{ type: OSCType.STRING },
+// 		{
+// 			type: [ OSCType.INT, OSCType.FALSE ],
+// 			range: [ { min: -100}, null ],
+// 		}
+// 	]
+// });
+// service.setValue("/test", 0, "asd");
+// service.setValue("/test", 1, [ 1, false ]);
 
 service.start();

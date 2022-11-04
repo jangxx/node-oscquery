@@ -12,7 +12,8 @@ import {
 
 import {
 	OSCQueryDiscovery,
-	OSCQueryDiscoveryOptions,
+	// OSCQueryDiscoveryOptions,
+	DiscoveredService,
 } from "./lib/osc_query_discovery";
 
 import {
@@ -30,5 +31,6 @@ export {
 	OSCTypeSimple as OSCType,
 	OSCQAccess,
 	OSCQueryDiscovery,
-	OSCQueryDiscoveryOptions,
+	DiscoveredService,
+	// OSCQueryDiscoveryOptions,
 };

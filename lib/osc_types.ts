@@ -42,13 +42,17 @@ export const OSCTypeSimpleMap: Record<string, OSCTypeSimple> = {
 
 export type OSCType = OSCTypeSimple | OSCType[];
 
-export interface OSCQRange {
+export interface OSCQRangeSingle {
 	min?: number;
 	max?: number;
 	vals?: unknown[];
 }
 
-export type OSCQClipmode = "none" | "low" | "high" | "both";
+export type OSCQRange = OSCQRangeSingle | null | OSCQRange[];
+
+export type OSCQClipmodeSingle = "none" | "low" | "high" | "both";
+
+export type OSCQClipmode = OSCQClipmodeSingle | null | OSCQClipmode[];
 
 export enum OSCQAccess {
 	NO_VALUE = 0,

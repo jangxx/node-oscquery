@@ -1,5 +1,6 @@
 import http from "node:http";
 import { getResponder, type Responder, type CiaoService, Protocol } from "@homebridge/ciao";
+import portfinder from "portfinder";
 
 import { OSCNode } from "./osc_node"; 
 import { SerializedHostInfo, SerializedNode } from "./serialized_node";
@@ -7,7 +8,7 @@ import { OSCQAccess } from "./osc_types";
 import { OSCMethodDescription } from "./osc_method_description";
 
 export interface OSCQueryServiceOptions {
-	httpPort: number;
+	httpPort?: number;
 	bindAddress?: string;
 	rootDescription?: string,
 	oscQueryHostName?: string,
@@ -55,23 +56,17 @@ function respondJson(json: Object, res: http.ServerResponse) {
 
 export class OSCQueryServer {
 	private _mdns: Responder;
-	private _mdnsService: CiaoService;
+	private _mdnsService: CiaoService | null = null;
 	private _server: http.Server;
 	private _opts: OSCQueryServiceOptions;
 	private _root: OSCNode = new OSCNode("");
 
-	constructor(opts: OSCQueryServiceOptions) {
-		this._opts = opts;
+	constructor(opts?: OSCQueryServiceOptions) {
+		this._opts = opts || {};
 
 		this._server = http.createServer(this._httpHandler.bind(this));
 
 		this._mdns = getResponder();
-		this._mdnsService = this._mdns.createService({
-			name: opts.serviceName || "OSCQuery",
-			type: "oscjson",
-			port: opts.httpPort,
-			protocol: Protocol.TCP,
-		});
 
 		this._root.setOpts({
 			description: this._opts.rootDescription || "root node",
@@ -102,9 +97,9 @@ export class OSCQueryServer {
 			const hostInfo: SerializedHostInfo = {
 				NAME: this._opts.oscQueryHostName,
 				EXTENSIONS,
-				OSC_IP: this._opts.oscIp,
-				OSC_PORT: this._opts.oscPort,
-				OSC_TRANSPORT: this._opts.oscTransport,
+				OSC_IP: this._opts.oscIp || this._opts.bindAddress || "0.0.0.0", // the proposal says that an undefined OSC_IP means that the http host should be used, but I think it's okay to be nice about it
+				OSC_PORT: this._opts.oscPort || this._opts.httpPort, // the proposal says that an undefined OSC_PORT means that the http port should be used, but I think it's okay to be nice about it
+				OSC_TRANSPORT: this._opts.oscTransport || "UDP", // per the proposal the default for an undefined values is "UDP", but there is nothing wrong with setting it either way
 				// WS_IP: this._opts.wsIp,
 				// WS_PORT: this._opts.wsPort,
 			};
@@ -158,25 +153,36 @@ export class OSCQueryServer {
 		return node;
 	}
 
-	start(): Promise<[void, void]> {
+	async start(): Promise<void> {
+		if (!this._opts.httpPort) {
+			this._opts.httpPort = await portfinder.getPortPromise();
+		}
+
 		const httpListenPromise: Promise<void> = new Promise(resolve => {
 			this._server.listen(this._opts.httpPort, this._opts.bindAddress || "0.0.0.0", resolve);
 		});
 
-		return Promise.all([
+		this._mdnsService = this._mdns.createService({
+			name: this._opts.serviceName || "OSCQuery",
+			type: "oscjson",
+			port: this._opts.httpPort,
+			protocol: Protocol.TCP,
+		});
+
+		await Promise.all([
 			httpListenPromise,
 			this._mdnsService.advertise(),
 		]);
 	}
 
-	stop(): Promise<[void, void]> {
+	async stop(): Promise<void> {
 		const httpEndPromise: Promise<void> = new Promise((resolve, reject) => {
 			this._server.close(err => err ? reject(err) : resolve());
 		});
 
-		return Promise.all([
+		await Promise.all([
 			httpEndPromise,
-			this._mdnsService.end(),
+			this._mdnsService ? this._mdnsService.end() : Promise.resolve(),
 		]);
 	}
 

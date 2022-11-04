@@ -1,5 +1,5 @@
 import { OSCTypeSimple, OSCType, OSCQClipmode, OSCQRange, OSCQAccess } from "./osc_types";
-import { SerializedNode } from "./serialized_node";
+import { SerializedNode, SerializedRange } from "./serialized_node";
 import { OSCMethodArgument, OSCMethodDescription } from "./osc_method_description";
 
 function getTypeString(type: OSCType): string {
@@ -7,6 +7,22 @@ function getTypeString(type: OSCType): string {
 		return "[" + type.map(getTypeString).join("") + "]";
 	} else {
 		return type;
+	}
+}
+
+function serializeRange(range: OSCQRange): SerializedRange {
+	if (Array.isArray(range)) {
+		return range.map(r => serializeRange(r));
+	} else {
+		if (range !== null) {
+			return {
+				MAX: range.max,
+				MIN: range.min,
+				VALS: range.vals,
+			};
+		} else {
+			return null;
+		}
 	}
 }
 
@@ -20,7 +36,7 @@ function assembleFullPath(node: OSCNode): string {
 
 function allNull(arr: unknown[]): boolean {
 	for (const elem of arr) {
-		if (arr !== null) return false;
+		if (elem !== null) return false;
 	}
 	return true;
 }
@@ -54,24 +70,31 @@ export class OSCNode {
 	}
 
 	_getMethodDescription(full_path: string): OSCMethodDescription {
-		return {
+		const desc: OSCMethodDescription = {
 			full_path,
-			description: this._description,
-			access: this._access,
-			tags: this._tags,
-			critical: this._critical,
-			arguments: this._args,
 		};
+		if (this._description) desc.description = this._description;
+		if (this._access) desc.access = this._access;
+		if (this._tags) desc.tags = this._tags;
+		if (this._critical) desc.critical = this._critical;
+		if (this._args) desc.arguments = this._args;
+
+		return desc;
 	}
 
-	*_methodGenerator(starting_path: string = ""): Generator<OSCMethodDescription> {
+	*_methodGenerator(starting_path: string = "/"): Generator<OSCMethodDescription> {
 		if (!this.isContainer()) {
-			yield this._getMethodDescription(starting_path + this.name);
+			yield this._getMethodDescription(starting_path);
+		}
+
+		// if we are not at the root level, add a / to separate the path from the child names
+		if (starting_path !== "/") {
+			starting_path += "/";
 		}
 
 		if (this._children) {
 			for (const child of Object.values(this._children)) {
-				for (const md of child._methodGenerator(starting_path + "/" + child.name)) {
+				for (const md of child._methodGenerator(starting_path + child.name)) {
 					yield md;
 				}
 			}
@@ -181,11 +204,7 @@ export class OSCNode {
 			if (!allNull(arg_ranges)) {
 				result.RANGE = arg_ranges.map(range => {
 					if (range) {
-						return {
-							MAX: range.max,
-							MIN: range.min,
-							VALS: range.vals,
-						}
+						return serializeRange(range);
 					} else {
 						return null;
 					}
