@@ -2,23 +2,9 @@ import { EventEmitter } from "node:events";
 import Bonjour, { type Browser, type Service } from "bonjour-service";
 import axios from "axios";
 import { SerializedHostInfo, SerializedNode, SerializedRange } from "./serialized_node";
-import { OSCMethodDescription, OSCMethodArgument } from "./osc_method_description";
-import { OSCQAccess, OSCQAccessMap, OSCQRange, OSCType, OSCTypeSimpleMap } from "./osc_types";
+import { OSCMethodArgument } from "./osc_method_description";
+import { OSCQAccessMap, OSCQRange, OSCType, OSCTypeSimpleMap, HostInfo } from "./osc_types";
 import { OSCNode } from "./osc_node";
-
-// export interface OSCQueryDiscoveryOptions {
-	
-// }
-
-interface HostInfo {
-	name?: string;
-	extensions?: Record<string, boolean>;
-	oscIp?: string;
-	oscPort?: number;
-	oscTransport?: "TCP" | "UDP";
-	wsIp?: string;
-	wsPort?: number;
-}
 
 function deserializeHostInfo(host_info: SerializedHostInfo): HostInfo {
 	return {
@@ -202,7 +188,7 @@ export class OSCQueryDiscovery extends EventEmitter {
 		});
 	}
 
-	async queryNewService(address: string, port: number) {
+	async queryNewService(address: string, port: number): Promise<DiscoveredService> {
 		const service = new DiscoveredService(
 			address,
 			port,
@@ -212,6 +198,7 @@ export class OSCQueryDiscovery extends EventEmitter {
 
 		this._services.push(service);
 		this.emit("up", service);
+		return service;
 	}
 
 	start() {

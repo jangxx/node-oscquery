@@ -4,7 +4,7 @@ import portfinder from "portfinder";
 
 import { OSCNode } from "./osc_node"; 
 import { SerializedHostInfo, SerializedNode } from "./serialized_node";
-import { OSCQAccess } from "./osc_types";
+import { HostInfo, OSCQAccess } from "./osc_types";
 import { OSCMethodDescription } from "./osc_method_description";
 
 export interface OSCQueryServiceOptions {
@@ -153,7 +153,7 @@ export class OSCQueryServer {
 		return node;
 	}
 
-	async start(): Promise<void> {
+	async start(): Promise<HostInfo> {
 		if (!this._opts.httpPort) {
 			this._opts.httpPort = await portfinder.getPortPromise();
 		}
@@ -173,6 +173,14 @@ export class OSCQueryServer {
 			httpListenPromise,
 			this._mdnsService.advertise(),
 		]);
+
+		return {
+			name: this._opts.oscQueryHostName,
+			extensions: EXTENSIONS,
+			oscIp: this._opts.oscIp || this._opts.bindAddress || "0.0.0.0",
+			oscPort: this._opts.oscPort || this._opts.httpPort,
+			oscTransport: this._opts.oscTransport || "UDP",
+		};
 	}
 
 	async stop(): Promise<void> {
@@ -186,7 +194,7 @@ export class OSCQueryServer {
 		]);
 	}
 
-	addEndpoint(path: string, params: OSCMethodDescription) {
+	addMethod(path: string, params: OSCMethodDescription) {
 		const path_split = path.split("/").filter(p => p !== "");
 
 		let node = this._root;
@@ -198,7 +206,7 @@ export class OSCQueryServer {
 		node.setOpts(params);
 	}
 
-	removeEndpoint(path: string) {
+	removeMethod(path: string) {
 		let node = this._getNodeForPath(path);
 
 		if (!node) return;

@@ -71,3 +71,13 @@ export const OSCQAccessMap: Record<number, OSCQAccess> = {
 	2: OSCQAccess.WRITEONLY,
 	3: OSCQAccess.READWRITE,
 };
+
+export interface HostInfo {
+	name?: string;
+	extensions?: Record<string, boolean>;
+	oscIp?: string;
+	oscPort?: number;
+	oscTransport?: "TCP" | "UDP";
+	wsIp?: string;
+	wsPort?: number;
+}

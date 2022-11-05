@@ -32,5 +32,4 @@ export {
 	OSCQAccess,
 	OSCQueryDiscovery,
 	DiscoveredService,
-	// OSCQueryDiscoveryOptions,
 };

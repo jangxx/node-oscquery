@@ -149,6 +149,10 @@ export class OSCNode {
 		return this._children[path];
 	}
 
+	getChildren() {
+		return Object.values(this._children);
+	}
+
 	removeChild(path: string) {
 		if (this.hasChild(path)) {
 			delete this._children[path];

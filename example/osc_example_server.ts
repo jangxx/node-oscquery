@@ -18,7 +18,7 @@ const service = new OSCQueryServer({
 	serviceName: "Fake VRChat Chatbox"
 });
 
-service.addEndpoint("/chatbox/input", {
+service.addMethod("/chatbox/input", {
 	description: "Test VRChat chatbox input",
 	access: OSCQAccess.WRITEONLY,
 	arguments: [
@@ -27,7 +27,7 @@ service.addEndpoint("/chatbox/input", {
 	]
 });
 
-service.addEndpoint("/chatbox/typing", {
+service.addMethod("/chatbox/typing", {
 	description: "Test VRChat typing indicator",
 	access: OSCQAccess.WRITEONLY,
 	arguments: [

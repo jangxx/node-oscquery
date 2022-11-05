@@ -14,4 +14,4 @@ export interface OSCMethodArgument {
 	range?: OSCQRange,
 	clipmode?: OSCQClipmode,
 	value?: unknown,
-};
+}

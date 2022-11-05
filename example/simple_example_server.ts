@@ -8,7 +8,7 @@ import {
 
 const service = new OSCQueryServer();
 
-service.addEndpoint("/foo", {
+service.addMethod("/foo", {
 	description: "demonstrates a read-only OSC node- single float value ranged 0-100",
 	access: OSCQAccess.READONLY,
 	arguments: [
@@ -20,7 +20,7 @@ service.addEndpoint("/foo", {
 });
 service.setValue("/foo", 0, 0.5);
 
-service.addEndpoint("/bar", {
+service.addMethod("/bar", {
 	description: "demonstrates a read/write OSC node- two ints with different ranges",
 	access: OSCQAccess.READWRITE,
 	arguments: [
@@ -37,11 +37,11 @@ service.addEndpoint("/bar", {
 service.setValue("/bar", 0, 4);
 service.setValue("/bar", 1, 51);
 
-service.addEndpoint("/baz", {
+service.addMethod("/baz", {
 	description: "simple container node, with one method- qux",
 });
 
-service.addEndpoint("/baz/qux", {
+service.addMethod("/baz/qux", {
 	description: "read/write OSC node- accepts one of several string-type inputs",
 	access: OSCQAccess.RW,
 	arguments: [
