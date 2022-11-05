@@ -1,6 +1,6 @@
 import {
 	OSCQueryServer,
-	OSCType,
+	OSCTypeSimple,
 	OSCQAccess,
 } from "../index";
 
@@ -22,8 +22,8 @@ service.addMethod("/chatbox/input", {
 	description: "Test VRChat chatbox input",
 	access: OSCQAccess.WRITEONLY,
 	arguments: [
-		{ type: OSCType.STRING },
-		{ type: OSCType.INT },
+		{ type: OSCTypeSimple.STRING },
+		{ type: OSCTypeSimple.INT },
 	]
 });
 
@@ -31,7 +31,7 @@ service.addMethod("/chatbox/typing", {
 	description: "Test VRChat typing indicator",
 	access: OSCQAccess.WRITEONLY,
 	arguments: [
-		{ type: OSCType.INT }
+		{ type: OSCTypeSimple.INT }
 	]
 });
 

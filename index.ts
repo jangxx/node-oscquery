@@ -4,15 +4,16 @@ import {
 } from "./lib/osc_query_server";
 
 import {
+	OSCType,
 	OSCTypeSimple,
 	OSCQRange,
 	OSCQClipmode,
-	OSCQAccess
+	OSCQAccess,
+	HostInfo,
 } from "./lib/osc_types";
 
 import {
 	OSCQueryDiscovery,
-	// OSCQueryDiscoveryOptions,
 	DiscoveredService,
 } from "./lib/osc_query_discovery";
 
@@ -28,8 +29,10 @@ export {
 	OSCMethodArgument,
 	OSCQRange,
 	OSCQClipmode,
-	OSCTypeSimple as OSCType,
+	OSCType,
+	OSCTypeSimple,
 	OSCQAccess,
+	HostInfo,
 	OSCQueryDiscovery,
 	DiscoveredService,
 };

@@ -10,7 +10,7 @@ An implementation of the [OSCQuery proposal](https://github.com/Vidvox/OSCQueryP
 ```ts
 import {
 	OSCQueryServer,
-	OSCType,
+	OSCTypeSimple,
 	OSCQAccess,
 } from "oscquery";
 
@@ -21,7 +21,7 @@ service.addMethod("/foo", {
 	access: OSCQAccess.READONLY,
 	arguments: [
 		{ 
-			type: OSCType.FLOAT,
+			type: OSCTypeSimple.FLOAT,
 			range: { min: 0, max: 100},
 		}
 	]
@@ -33,11 +33,11 @@ service.addMethod("/bar", {
 	access: OSCQAccess.READWRITE,
 	arguments: [
 		{
-			type: OSCType.INT,
+			type: OSCTypeSimple.INT,
 			range: { min: 0, max: 50 },
 		},
 		{
-			type: OSCType.INT,
+			type: OSCTypeSimple.INT,
 			range: { min: 51, max: 100 },
 		}
 	]
