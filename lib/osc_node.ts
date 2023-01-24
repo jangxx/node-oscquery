@@ -1,4 +1,4 @@
-import { OSCTypeSimple, OSCType, OSCQClipmode, OSCQRange, OSCQAccess } from "./osc_types";
+import { OSCType, OSCQClipmode, OSCQRange, OSCQAccess } from "./osc_types";
 import { SerializedNode, SerializedRange } from "./serialized_node";
 import { OSCMethodArgument, OSCMethodDescription } from "./osc_method_description";
 
@@ -111,18 +111,26 @@ export class OSCNode {
 
 	setValue(arg_index: number, value: unknown) {
 		if (!this._args || arg_index >= this._args.length) {
-			throw new Error("Argument index out of range")
+			throw new Error("Argument index out of range");
 		}
 
 		this._args[arg_index].value = value;
 	}
 
-	unsetValue(arg_index: number, value: unknown) {
+	unsetValue(arg_index: number) {
 		if (!this._args || arg_index >= this._args.length) {
-			throw new Error("Argument index out of range")
+			throw new Error("Argument index out of range");
 		}
 
 		delete this._args[arg_index].value;
+	}
+
+	getValue(arg_index: number): unknown | null {
+		if (!this._args || arg_index >= this._args.length) {
+			return null;
+		}
+
+		return this._args[arg_index].value;
 	}
 
 	isEmpty() { // if there are no arguments and no children, the node is empty
@@ -167,8 +175,8 @@ export class OSCNode {
 		return this._children[path];
 	}
 
-	serialize(full_path: string | null = null): SerializedNode {
-		full_path = assembleFullPath(this);
+	serialize(): SerializedNode {
+		const full_path = assembleFullPath(this);
 
 		const result: SerializedNode = {
 			FULL_PATH: full_path || "/",
@@ -185,7 +193,7 @@ export class OSCNode {
 
 		if (Object.keys(this._children).length > 0) {
 			result.CONTENTS = Object.fromEntries(Object.entries(this._children).map(([name, node]) => {
-				return [ name, node.serialize(full_path + "/" + name) ]
+				return [ name, node.serialize() ]
 			}));
 		}
 
@@ -198,9 +206,9 @@ export class OSCNode {
 
 			for (const arg of this._args) {
 				arg_types += getTypeString(arg.type);
-				arg_values.push(arg.value || null);
-				arg_ranges.push(arg.range || null);
-				arg_clipmodes.push(arg.clipmode || null);
+				arg_values.push(arg.value ?? null);
+				arg_ranges.push(arg.range ?? null);
+				arg_clipmodes.push(arg.clipmode ?? null);
 			}
 
 			result.TYPE = arg_types;

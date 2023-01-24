@@ -229,11 +229,11 @@ export class OSCQueryServer {
 		}
 	}
 
-	unsetValue(path: string, arg_index: number, value: unknown) {
+	unsetValue(path: string, arg_index: number) {
 		const node = this._getNodeForPath(path);
 
 		if (node) {
-			node.unsetValue(arg_index, value);
+			node.unsetValue(arg_index);
 		}
 	}
 }

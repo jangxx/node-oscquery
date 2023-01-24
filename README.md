@@ -185,3 +185,19 @@ Using this method is recommended instead of traversing the node tree manually.
 
 **update**(): `Promise<void>`  
 Refreshes the HOST_INFO and nodes by calling the respective HTTP endpoints again.
+
+**resolvePath**(path: `string`): `OSCNode | null`  
+Resolves a path from the node tree or returns `null` if the path does not exist.
+
+## `OSCNode`
+
+Most of the methods on this class are not designed to be called from the outside, so this documentation is only going to document the most common properties and methods.
+
+_readonly_ **name**: `string`  
+The name (i.e. path component) of the node.
+
+**getValue**(arg_index: `number`): `unknown`  
+Retrieves the VALUE with the specified index, or `null` if it is not set.
+
+**serialize**(): `SerializedNode`  
+Serializes the node (and all children) into a simple object which matches the http response to a query without a specific attribute in the query part of the URL.

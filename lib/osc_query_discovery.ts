@@ -155,6 +155,22 @@ export class DiscoveredService {
 		this._hostInfo = deserializeHostInfo(hostInfoResp.data);
 		this._nodes = deserializeMethodNode(baseResp.data);
 	}
+
+	resolvePath(path: string): OSCNode | null {
+		const path_split = path.split("/").filter(p => p !== "");
+
+		let node = this.nodes;
+
+		for (const path_component of path_split) {
+			if (node.hasChild(path_component)) {
+				node = node.getChild(path_component);
+			} else {
+				return null; // this endpoint doesn't exist
+			}
+		}
+
+		return node;
+	}
 }
 
 export class OSCQueryDiscovery extends EventEmitter {
