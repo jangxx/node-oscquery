@@ -162,11 +162,14 @@ export class OSCQueryServer {
 			this._server.listen(this._opts.httpPort, this._opts.bindAddress || "0.0.0.0", resolve);
 		});
 
+		const serviceName = this._opts.serviceName ?? "OSCQuery";
+
 		this._mdnsService = this._mdns.createService({
-			name: this._opts.serviceName || "OSCQuery",
+			name: serviceName,
 			type: "oscjson",
 			port: this._opts.httpPort,
 			protocol: Protocol.TCP,
+			hostname: `${serviceName}._oscjson._tcp`,
 		});
 
 		await Promise.all([
