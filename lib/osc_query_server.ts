@@ -6,8 +6,9 @@ import { OSCNode } from "./osc_node";
 import { SerializedHostInfo, SerializedNode } from "./serialized_node";
 import { HostInfo, OSCQAccess } from "./osc_types";
 import { OSCMethodDescription } from "./osc_method_description";
+import { OSCQueryService } from "./osc_query_service";
 
-export interface OSCQueryServiceOptions {
+export interface OSCQueryServerOptions {
 	httpPort?: number;
 	bindAddress?: string;
 	rootDescription?: string,
@@ -16,9 +17,12 @@ export interface OSCQueryServiceOptions {
 	oscPort?: number,
 	oscTransport?: "TCP" | "UDP",
 	serviceName?: string,
+	httpFilter?: HttpFilterFunction,
 	// wsIp?: string,
 	// wsPort?: string,
 }
+
+export type HttpFilterFunction = (req: http.IncomingMessage) => Promise<boolean> | boolean | Promise<OSCQueryService> | OSCQueryService;
 
 const EXTENSIONS = {
 	ACCESS: true,
@@ -54,39 +58,40 @@ function respondJson(json: Object, res: http.ServerResponse) {
 	res.end();
 }
 
-export class OSCQueryServer {
+export class OSCQueryServer extends OSCQueryService {
 	private _mdns: Responder;
 	private _mdnsService: CiaoService | null = null;
 	private _server: http.Server;
-	private _opts: OSCQueryServiceOptions;
-	private _root: OSCNode = new OSCNode("");
+	private _opts: OSCQueryServerOptions;
+	private _httpFilter: HttpFilterFunction;
 
-	constructor(opts?: OSCQueryServiceOptions) {
+	constructor(opts?: OSCQueryServerOptions) {
+		super({
+			rootDescription: opts?.rootDescription,
+		});
+
 		this._opts = opts || {};
 
 		this._server = http.createServer(this._httpHandler.bind(this));
 
 		this._mdns = getResponder();
 
-		this._root.setOpts({
-			description: this._opts.rootDescription || "root node",
-			access: OSCQAccess.NO_VALUE,
-		});
+		this._httpFilter = opts?.httpFilter || (() => true);
 	}
 
-	_httpHandler(req: http.IncomingMessage, res: http.ServerResponse) {
+	private _httpHandler(req: http.IncomingMessage, res: http.ServerResponse) {
 		if (req.method != "GET") {
 			res.statusCode = 400;
 			res.end();
 		}
 
-		const url = new URL(req.url!, `http://${req.headers.host}`);
-		return this._handleGet(url, res);
+		return this._handleGet(req, res);
 	}
 
-	_handleGet(url: URL, res: http.ServerResponse) {
+	private async _handleGet(req: http.IncomingMessage, res: http.ServerResponse) {
+		const url = new URL(req.url!, `http://${req.headers.host}`);
+
 		const query = (url.search.length > 0) ? url.search.substring(1) : null;
-		const path_split = url.pathname.split("/").filter(p => p !== "");
 
 		if (query && !VALID_ATTRIBUTES.includes(query)) {
 			res.statusCode = 400;
@@ -107,15 +112,23 @@ export class OSCQueryServer {
 			return respondJson(hostInfo, res);
 		}
 
-		let node = this._root;
+		const httpFilterResult = await this._httpFilter(req);
+		let node: OSCNode | null = null;
 
-		for (const path_component of path_split) {
-			if (node.hasChild(path_component)) {
-				node = node.getChild(path_component);
-			} else {
+		if (typeof httpFilterResult === "boolean") {
+			if (!httpFilterResult) {
 				res.statusCode = 404;
 				return res.end();
+			} else {
+				node = this.getNodeForPath(url.pathname);
 			}
+		} else if (httpFilterResult instanceof OSCQueryService) {
+			node = httpFilterResult.getNodeForPath(url.pathname);
+		}
+
+		if (node === null) {
+			res.statusCode = 404;
+			return res.end();
 		}
 
 		if (!query) {
@@ -137,22 +150,6 @@ export class OSCQueryServer {
 		}
 	}
 
-	_getNodeForPath(path: string): OSCNode | null {
-		const path_split = path.split("/").filter(p => p !== "");
-
-		let node = this._root;
-
-		for (const path_component of path_split) {
-			if (node.hasChild(path_component)) {
-				node = node.getChild(path_component);
-			} else {
-				return null; // this endpoint doesn't exist
-			}
-		}
-
-		return node;
-	}
-
 	async start(): Promise<HostInfo> {
 		if (!this._opts.httpPort) {
 			this._opts.httpPort = await portfinder.getPortPromise();
@@ -162,14 +159,14 @@ export class OSCQueryServer {
 			this._server.listen(this._opts.httpPort, this._opts.bindAddress || "0.0.0.0", resolve);
 		});
 
-		const serviceName = this._opts.serviceName ?? "OSCQuery";
+		const serviceName = (this._opts.serviceName ?? "OSCQuery").trim();
 
 		this._mdnsService = this._mdns.createService({
 			name: serviceName,
 			type: "oscjson",
 			port: this._opts.httpPort,
 			protocol: Protocol.TCP,
-			hostname: `${serviceName}._oscjson._tcp`,
+			hostname: `${serviceName.replace(/ /g, "-")}._oscjson._tcp`,
 		});
 
 		await Promise.all([
@@ -195,48 +192,5 @@ export class OSCQueryServer {
 			httpEndPromise,
 			this._mdnsService ? this._mdnsService.end() : Promise.resolve(),
 		]);
-	}
-
-	addMethod(path: string, params: OSCMethodDescription) {
-		const path_split = path.split("/").filter(p => p !== "");
-
-		let node = this._root;
-
-		for (const path_component of path_split) {
-			node = node.getOrCreateChild(path_component);
-		}
-
-		node.setOpts(params);
-	}
-
-	removeMethod(path: string) {
-		let node = this._getNodeForPath(path);
-
-		if (!node) return;
-
-		node.setOpts({}); // make the node into an empty container
-
-		// go back through the nodes in reverse and delete nodes until we have either reached the root or
-		// hit a non-empty one
-		while (node.parent != null && node.isEmpty()) {
-			node.parent.removeChild(node.name);
-			node = node.parent;
-		}
-	}
-
-	setValue(path: string, arg_index: number, value: unknown) {
-		const node = this._getNodeForPath(path);
-
-		if (node) {
-			node.setValue(arg_index, value);
-		}
-	}
-
-	unsetValue(path: string, arg_index: number) {
-		const node = this._getNodeForPath(path);
-
-		if (node) {
-			node.unsetValue(arg_index);
-		}
 	}
 }

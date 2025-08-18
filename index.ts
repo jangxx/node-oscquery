@@ -1,6 +1,6 @@
 import {
 	OSCQueryServer,
-	OSCQueryServiceOptions,
+	OSCQueryServerOptions,
 } from "./lib/osc_query_server";
 
 import {
@@ -24,7 +24,7 @@ import {
 
 export {
 	OSCQueryServer,
-	OSCQueryServiceOptions,
+	OSCQueryServerOptions as OSCQueryServiceOptions,
 	OSCMethodDescription,
 	OSCMethodArgument,
 	OSCQRange,

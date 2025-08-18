@@ -16,20 +16,25 @@ if (process.argv.length > 2) {
 	oscPort = Number(process.argv[2]);
 }
 
-const service = new OSCQueryServer({
+const oscqServer = new OSCQueryServer({
 	oscPort,
 	httpPort: oscPort,
-	serviceName: "VRC-Example-Receiver"
+	serviceName: "VRC-Example-Receiver",
+	httpFilter: (req) => {
+		console.log(req.socket.remoteAddress, req.socket.remotePort, req.method, req.url, req.headers);
+
+		return true;
+	}
 });
 
-service.addMethod("/avatar/change", {
+oscqServer.addMethod("/avatar/change", {
 	access: OSCQAccess.WRITEONLY,
 	arguments: [
 		{ type: OSCTypeSimple.STRING },
 	]
 });
 
-service.start().then(() => {
+oscqServer.start().then(() => {
 	console.log(`OSCQuery server is listening on port ${oscPort}`);
 });
 
@@ -37,8 +42,9 @@ const oscServer = new Server(oscPort, "0.0.0.0", () => {
 	console.log(`OSC server is listening on port ${oscPort}`);
 });
 
-oscServer.on("message", msg => {
+oscServer.on("message", (msg, ...args) => {
 	const address = msg[0];
-	const data = msg.slice(1);
-	console.log(`Address: ${address}, Data: ${data.join(", ")}`);
+	// const data = msg.slice(1);
+	// console.log(`Address: ${address}, Data: ${data.join(", ")}`);
+	console.log(address, (args as any)[0]);
 });
